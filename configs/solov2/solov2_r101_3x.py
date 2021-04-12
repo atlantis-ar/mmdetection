@@ -1,3 +1,8 @@
+# _base_ = [
+#    '../_base_/datasets/coco_instance.py',
+#    ' ../_base_/datasets/coco_instance_semantic.py',
+#    '../_base_/schedules/schedule_1x.py', '../_base_/default_runtime.py'
+# ]
 # model settings
 model = dict(
     type='SOLOv2',
@@ -6,7 +11,7 @@ model = dict(
         type='ResNet',
         depth=101,
         num_stages=4,
-        out_indices=(0, 1, 2, 3), # C2, C3, C4, C5
+        out_indices=(0, 1, 2, 3),  # C2, C3, C4, C5
         frozen_stages=1,
         style='pytorch'),
     neck=dict(
@@ -20,16 +25,13 @@ model = dict(
         num_classes=80,
         in_channels=256,
         stacked_convs=4,
-        seg_feat_channels=512,#256,
+        seg_feat_channels=512,  # 256,
         strides=[8, 8, 16, 32, 32],
         scale_ranges=((1, 96), (48, 192), (96, 384), (192, 768), (384, 2048)),
         sigma=0.2,
         num_grids=[40, 36, 24, 16, 12],
         ins_out_channels=256,
-        loss_mask=dict(
-            type='DiceLoss',
-            use_sigmoid=True,
-            loss_weight=3.0),
+        loss_mask=dict(type='DiceLoss', use_sigmoid=True, loss_weight=3.0),
         loss_cls=dict(
             type='FocalLoss',
             use_sigmoid=True,
@@ -46,19 +48,19 @@ model = dict(
         num_classes=256,
         norm_cfg=dict(type='GN', num_groups=32, requires_grad=True)),
 
-        # cate_down_pos=0,
-        # with_deform=False,
-        # loss_ins=dict(
-        #     type='DiceLoss',
-        #     use_sigmoid=True,
-        #     loss_weight=3.0),
-        # loss_cate=dict(
-        #     type='FocalLoss',
-        #     use_sigmoid=True,
-        #     gamma=2.0,
-        #     alpha=0.25,
-        #     loss_weight=1.0),
-    )
+    # cate_down_pos=0,
+    # with_deform=False,
+    # loss_ins=dict(
+    #     type='DiceLoss',
+    #     use_sigmoid=True,
+    #     loss_weight=3.0),
+    # loss_cate=dict(
+    #     type='FocalLoss',
+    #     use_sigmoid=True,
+    #     gamma=2.0,
+    #     alpha=0.25,
+    #     loss_weight=1.0),
+)
 # training and testing settings
 train_cfg = dict()
 test_cfg = dict(
@@ -77,11 +79,12 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True, with_mask=True),
-    dict(type='Resize',
-         img_scale=[(1333, 800), (1333, 768), (1333, 736),
-                    (1333, 704), (1333, 672), (1333, 640)],
-         multiscale_mode='value',
-         keep_ratio=True),
+    dict(
+        type='Resize',
+        img_scale=[(1333, 800), (1333, 768), (1333, 736), (1333, 704),
+                   (1333, 672), (1333, 640)],
+        multiscale_mode='value',
+        keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
@@ -104,7 +107,7 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    imgs_per_gpu=4,
+    samples_per_gpu=4,
     workers_per_gpu=4,
     train=dict(
         type=dataset_type,

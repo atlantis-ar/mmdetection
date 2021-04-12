@@ -1,11 +1,12 @@
-import numpy as np
-from scipy import ndimage
 import mmcv
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from mmcv.cnn import ConvModule, bias_init_with_prob, normal_init
-from mmdet.core import multi_apply, matrix_nms
+from scipy import ndimage
+
+from mmdet.core import matrix_nms, multi_apply
 from ..builder import HEADS, build_loss
 from .base_dense_seg_head import BaseDenseSegHead
 
@@ -28,7 +29,7 @@ def dice_loss(input, target):
     b = torch.sum(input * input, 1) + 0.001
     c = torch.sum(target * target, 1) + 0.001
     d = (2 * a) / (b + c)
-    return 1-d
+    return 1 - d
 
 
 @HEADS.register_module()
@@ -44,8 +45,8 @@ class SOLOHead(BaseDenseSegHead):
                  stacked_convs=4,
                  strides=(8, 8, 16, 32, 32),
                  base_edge_list=(16, 32, 64, 128, 256),
-                 scale_ranges=((1, 96), (48, 192), (96, 384),
-                               (192, 768), (384, 2048)),
+                 scale_ranges=((1, 96), (48, 192), (96, 384), (192, 768),
+                               (384, 2048)),
                  sigma=0.2,
                  num_grids=None,
                  cate_down_pos=0,
@@ -110,8 +111,7 @@ class SOLOHead(BaseDenseSegHead):
         self.solo_ins_list = nn.ModuleList()
         for seg_num_grid in self.seg_num_grids:
             self.solo_ins_list.append(
-                nn.Conv2d(
-                    self.seg_feat_channels, seg_num_grid**2, 1))
+                nn.Conv2d(self.seg_feat_channels, seg_num_grid**2, 1))
 
         self.solo_cate = nn.Conv2d(
             self.seg_feat_channels, self.cate_out_channels, 3, padding=1)
@@ -131,30 +131,33 @@ class SOLOHead(BaseDenseSegHead):
         new_feats = self.split_feats(feats)
         featmap_sizes = [featmap.size()[-2:] for featmap in new_feats]
         upsampled_size = (featmap_sizes[0][0] * 2, featmap_sizes[0][1] * 2)
-        ins_pred, cate_pred = multi_apply(self.forward_single,
-                                          new_feats,
-                                          list(range(len(self.seg_num_grids))),
-                                          eval=eval,
-                                          upsampled_size=upsampled_size)
+        ins_pred, cate_pred = multi_apply(
+            self.forward_single,
+            new_feats,
+            list(range(len(self.seg_num_grids))),
+            eval=eval,
+            upsampled_size=upsampled_size)
         return ins_pred, cate_pred
 
     def split_feats(self, feats):
-        return (F.interpolate(feats[0], scale_factor=0.5, mode='bilinear'),
-                feats[1],
-                feats[2],
-                feats[3],
-                F.interpolate(feats[4], size=feats[3].shape[-2:],
-                mode='bilinear'))
+        return (F.interpolate(
+            feats[0], scale_factor=2, mode='bilinear',
+            align_corners=False), feats[1], feats[2], feats[3],
+                F.interpolate(
+                    feats[4],
+                    size=feats[3].shape[-2:],
+                    mode='bilinear',
+                    align_corners=False))
 
     def forward_single(self, x, idx, eval=False, upsampled_size=None):
         ins_feat = x
         cate_feat = x
         # ins branch
         # concat coord
-        x_range = torch.linspace(-1, 1, ins_feat.shape[-1],
-                                 device=ins_feat.device)
-        y_range = torch.linspace(-1, 1, ins_feat.shape[-2],
-                                 device=ins_feat.device)
+        x_range = torch.linspace(
+            -1, 1, ins_feat.shape[-1], device=ins_feat.device)
+        y_range = torch.linspace(
+            -1, 1, ins_feat.shape[-2], device=ins_feat.device)
         y, x = torch.meshgrid(y_range, x_range)
         y = y.expand([ins_feat.shape[0], 1, -1, -1])
         x = x.expand([ins_feat.shape[0], 1, -1, -1])
@@ -164,23 +167,30 @@ class SOLOHead(BaseDenseSegHead):
         for i, ins_layer in enumerate(self.ins_convs):
             ins_feat = ins_layer(ins_feat)
 
-        ins_feat = F.interpolate(ins_feat, scale_factor=2, mode='bilinear')
+        ins_feat = F.interpolate(
+            ins_feat, scale_factor=2, mode='bilinear', align_corners=False)
         ins_pred = self.solo_ins_list[idx](ins_feat)
 
         # cate branch
         for i, cate_layer in enumerate(self.cate_convs):
             if i == self.cate_down_pos:
                 seg_num_grid = self.seg_num_grids[idx]
-                cate_feat = F.interpolate(cate_feat, size=seg_num_grid,
-                                          mode='bilinear')
+                cate_feat = F.interpolate(
+                    cate_feat,
+                    size=seg_num_grid,
+                    mode='bilinear',
+                    align_corners=False)
             cate_feat = cate_layer(cate_feat)
 
         cate_pred = self.solo_cate(cate_feat)
         if eval:
-            ins_pred = F.interpolate(ins_pred.sigmoid(), size=upsampled_size,
-                                     mode='bilinear')
-            cate_pred = points_nms(cate_pred.sigmoid(),
-                                   kernel=2).permute(0, 2, 3, 1)
+            ins_pred = F.interpolate(
+                ins_pred.sigmoid(),
+                size=upsampled_size,
+                mode='bilinear',
+                align_corners=False)
+            cate_pred = points_nms(
+                cate_pred.sigmoid(), kernel=2).permute(0, 2, 3, 1)
         return ins_pred, cate_pred
 
     def loss(self,
@@ -191,8 +201,7 @@ class SOLOHead(BaseDenseSegHead):
              gt_mask_list,
              img_metas,
              gt_bboxes_ignore=None):
-        featmap_sizes = [featmap.size()[-2:] for featmap in
-                         ins_preds]
+        featmap_sizes = [featmap.size()[-2:] for featmap in ins_preds]
         ins_label_list, cate_label_list, ins_ind_label_list = multi_apply(
             self.solo_target_single,
             gt_bbox_list,
@@ -201,22 +210,29 @@ class SOLOHead(BaseDenseSegHead):
             featmap_sizes=featmap_sizes)
 
         # ins
-        ins_labels = [torch.cat([ins_labels_level_img[ind_level_img, ...]
-                      for ins_labels_level_img, ind_level_img in
-                      zip(ins_labels_level, ins_ind_labels_level)], 0)
-                      for ins_labels_level, ins_ind_labels_level in
-                      zip(zip(*ins_label_list), zip(*ins_ind_label_list))]
+        ins_labels = [
+            torch.cat([
+                ins_labels_level_img[ind_level_img, ...]
+                for ins_labels_level_img, ind_level_img in zip(
+                    ins_labels_level, ins_ind_labels_level)
+            ], 0) for ins_labels_level, ins_ind_labels_level in zip(
+                zip(*ins_label_list), zip(*ins_ind_label_list))
+        ]
 
-        ins_preds = [torch.cat([ins_preds_level_img[ind_level_img, ...]
-                     for ins_preds_level_img, ind_level_img in
-                     zip(ins_preds_level, ins_ind_labels_level)], 0)
-                     for ins_preds_level, ins_ind_labels_level in
-                     zip(ins_preds, zip(*ins_ind_label_list))]
+        ins_preds = [
+            torch.cat([
+                ins_preds_level_img[ind_level_img, ...]
+                for ins_preds_level_img, ind_level_img in zip(
+                    ins_preds_level, ins_ind_labels_level)
+            ], 0) for ins_preds_level, ins_ind_labels_level in zip(
+                ins_preds, zip(*ins_ind_label_list))
+        ]
 
         ins_ind_labels = [
-            torch.cat([ins_ind_labels_level_img.flatten()
-                      for ins_ind_labels_level_img in ins_ind_labels_level])
-            for ins_ind_labels_level in zip(*ins_ind_label_list)
+            torch.cat([
+                ins_ind_labels_level_img.flatten()
+                for ins_ind_labels_level_img in ins_ind_labels_level
+            ]) for ins_ind_labels_level in zip(*ins_ind_label_list)
         ]
         flatten_ins_ind_labels = torch.cat(ins_ind_labels)
 
@@ -224,9 +240,10 @@ class SOLOHead(BaseDenseSegHead):
 
         # cate
         cate_labels = [
-            torch.cat([cate_labels_level_img.flatten()
-                       for cate_labels_level_img in cate_labels_level])
-            for cate_labels_level in zip(*cate_label_list)
+            torch.cat([
+                cate_labels_level_img.flatten()
+                for cate_labels_level_img in cate_labels_level
+            ]) for cate_labels_level in zip(*cate_label_list)
         ]
         flatten_cate_labels = torch.cat(cate_labels)
         cate_preds = [
@@ -234,8 +251,8 @@ class SOLOHead(BaseDenseSegHead):
             for cate_pred in cate_preds
         ]
         flatten_cate_preds = torch.cat(cate_preds)
-        loss_cls = self.loss_cls(flatten_cate_preds, flatten_cate_labels,
-                                 avg_factor=num_ins + 1)
+        loss_cls = self.loss_cls(
+            flatten_cate_preds, flatten_cate_labels, avg_factor=num_ins + 1)
 
         # dice loss
         loss_mask = []
@@ -246,9 +263,7 @@ class SOLOHead(BaseDenseSegHead):
             loss_mask.append(dice_loss(input, target))
         loss_mask = torch.cat(loss_mask).mean()
         loss_mask = loss_mask * self.ins_loss_weight
-        return dict(
-            loss_mask=loss_mask,
-            loss_cls=loss_cls)
+        return dict(loss_mask=loss_mask, loss_cls=loss_cls)
 
     def solo_target_single(self,
                            gt_bboxes_raw,
@@ -266,18 +281,20 @@ class SOLOHead(BaseDenseSegHead):
         cate_label_list = []
         ins_ind_label_list = []
         for (lower_bound, upper_bound), stride, featmap_size, num_grid \
-            in zip(self.scale_ranges, self.strides,
-                   featmap_sizes, self.seg_num_grids):
+                in zip(self.scale_ranges, self.strides,
+                       featmap_sizes, self.seg_num_grids):
 
-            ins_label = torch.zeros([num_grid ** 2,
-                                    featmap_size[0], featmap_size[1]],
-                                    dtype=torch.uint8, device=device)
+            ins_label = torch.zeros(
+                [num_grid**2, featmap_size[0], featmap_size[1]],
+                dtype=torch.uint8,
+                device=device)
             # FG cat_id: [0, num_classes -1], BG cat_id: num_classes
             cate_label = torch.zeros([num_grid, num_grid],
                                      dtype=torch.int64,
                                      device=device) + self.num_classes
-            ins_ind_label = torch.zeros([num_grid ** 2],
-                                        dtype=torch.bool, device=device)
+            ins_ind_label = torch.zeros([num_grid**2],
+                                        dtype=torch.bool,
+                                        device=device)
 
             hit_indices = ((gt_areas >= lower_bound) &
                            (gt_areas <= upper_bound)).nonzero().flatten()
@@ -303,40 +320,44 @@ class SOLOHead(BaseDenseSegHead):
                 upsampled_size = (featmap_sizes[0][0] * 4,
                                   featmap_sizes[0][1] * 4)
                 center_h, center_w = ndimage.measurements.center_of_mass(
-                                                                seg_mask)
-                coord_w = int((center_w / upsampled_size[1]
-                               ) // (1. / num_grid))
-                coord_h = int((center_h / upsampled_size[0]
-                               ) // (1. / num_grid))
+                    seg_mask)
+                coord_w = int(
+                    (center_w / upsampled_size[1]) // (1. / num_grid))
+                coord_h = int(
+                    (center_h / upsampled_size[0]) // (1. / num_grid))
 
                 # left, top, right, down
-                top_box = max(0,
-                              int(((center_h - half_h) /
-                                  upsampled_size[0]) // (1. / num_grid)))
-                down_box = min(num_grid - 1,
-                               int(((center_h + half_h) /
-                                    upsampled_size[0]) // (1. / num_grid)))
-                left_box = max(0,
-                               int(((center_w - half_w) /
-                                    upsampled_size[1]) // (1. / num_grid)))
-                right_box = min(num_grid - 1,
-                                int(((center_w + half_w) /
-                                    upsampled_size[1]) // (1. / num_grid)))
+                top_box = max(
+                    0,
+                    int(((center_h - half_h) / upsampled_size[0]) //
+                        (1. / num_grid)))
+                down_box = min(
+                    num_grid - 1,
+                    int(((center_h + half_h) / upsampled_size[0]) //
+                        (1. / num_grid)))
+                left_box = max(
+                    0,
+                    int(((center_w - half_w) / upsampled_size[1]) //
+                        (1. / num_grid)))
+                right_box = min(
+                    num_grid - 1,
+                    int(((center_w + half_w) / upsampled_size[1]) //
+                        (1. / num_grid)))
 
-                top = max(top_box, coord_h-1)
-                down = min(down_box, coord_h+1)
-                left = max(coord_w-1, left_box)
-                right = min(right_box, coord_w+1)
+                top = max(top_box, coord_h - 1)
+                down = min(down_box, coord_h + 1)
+                left = max(coord_w - 1, left_box)
+                right = min(right_box, coord_w + 1)
 
-                cate_label[top:(down+1), left:(right+1)] = gt_label
+                cate_label[top:(down + 1), left:(right + 1)] = gt_label
                 # ins
                 seg_mask = mmcv.imrescale(seg_mask, scale=1. / output_stride)
                 seg_mask = torch.Tensor(seg_mask)
-                for i in range(top, down+1):
-                    for j in range(left, right+1):
+                for i in range(top, down + 1):
+                    for j in range(left, right + 1):
                         label = int(i * num_grid + j)
-                        ins_label[label, :seg_mask.shape[0],
-                                  :seg_mask.shape[1]] = seg_mask
+                        ins_label[label, :seg_mask.shape[0], :seg_mask.
+                                  shape[1]] = seg_mask
                         ins_ind_label[label] = True
             ins_label_list.append(ins_label)
             cate_label_list.append(cate_label)
@@ -352,9 +373,9 @@ class SOLOHead(BaseDenseSegHead):
         segm_result_list = []
         for img_id in range(len(img_metas)):
             cate_pred_list = [
-                cate_preds[i][img_id].view(
-                    -1, self.cate_out_channels).detach() for i in
-                range(num_levels)
+                cate_preds[i][img_id].view(-1,
+                                           self.cate_out_channels).detach()
+                for i in range(num_levels)
             ]
             seg_pred_list = [
                 seg_preds[i][img_id].detach() for i in range(num_levels)
@@ -376,13 +397,17 @@ class SOLOHead(BaseDenseSegHead):
 
     def segm2result(self, result):
         if result is None:
-            bbox_result = [np.zeros((0, 5), dtype=np.float32) for i in
-                           range(self.num_classes)]
+            bbox_result = [
+                np.zeros((0, 5), dtype=np.float32)
+                for i in range(self.num_classes)
+            ]
             # BG is not included in num_classes
             segm_result = [[] for _ in range(self.num_classes)]
         else:
-            bbox_result = [np.zeros((0, 5), dtype=np.float32) for i in
-                           range(self.num_classes)]
+            bbox_result = [
+                np.zeros((0, 5), dtype=np.float32)
+                for i in range(self.num_classes)
+            ]
             segm_result = [[] for _ in range(self.num_classes)]
             seg_pred = result[0].cpu().numpy()
             cate_label = result[1].cpu().numpy()
@@ -391,8 +416,9 @@ class SOLOHead(BaseDenseSegHead):
             # fake bboxes
             bboxes = np.zeros((num_ins, 5), dtype=np.float32)
             bboxes[:, -1] = cate_score
-            bbox_result = [bboxes[cate_label == i, :] for i in
-                           range(self.num_classes)]
+            bbox_result = [
+                bboxes[cate_label == i, :] for i in range(self.num_classes)
+            ]
             for idx in range(num_ins):
                 segm_result[cate_label[idx]].append(seg_pred[idx])
         return bbox_result, segm_result
@@ -420,18 +446,18 @@ class SOLOHead(BaseDenseSegHead):
         if len(cate_scores) == 0:
             return None
         # category labels.
-        inds = inds.nonzero()
+        inds = inds.nonzero(as_tuple=False)
         cate_labels = inds[:, 1]
 
         # strides.
         size_trans = cate_labels.new_tensor(
-                        self.seg_num_grids).pow(2).cumsum(0)
+            self.seg_num_grids).pow(2).cumsum(0)
         strides = cate_scores.new_ones(size_trans[-1])
         n_stage = len(self.seg_num_grids)
         strides[:size_trans[0]] *= self.strides[0]
         for ind_ in range(1, n_stage):
             strides[size_trans[ind_ - 1]:size_trans[ind_]] *= \
-                                             self.strides[ind_]
+                self.strides[ind_]
         strides = strides[inds[:, 0]]
 
         # masks.
@@ -465,9 +491,13 @@ class SOLOHead(BaseDenseSegHead):
         cate_labels = cate_labels[sort_inds]
 
         # Matrix NMS
-        cate_scores = matrix_nms(seg_masks, cate_labels, cate_scores,
-                                 kernel=cfg.kernel, sigma=cfg.sigma,
-                                 sum_masks=sum_masks)
+        cate_scores = matrix_nms(
+            seg_masks,
+            cate_labels,
+            cate_scores,
+            kernel=cfg.kernel,
+            sigma=cfg.sigma,
+            sum_masks=sum_masks)
 
         # filter.
         keep = cate_scores >= cfg.update_thr
@@ -485,11 +515,15 @@ class SOLOHead(BaseDenseSegHead):
         cate_scores = cate_scores[sort_inds]
         cate_labels = cate_labels[sort_inds]
 
-        seg_preds = F.interpolate(seg_preds.unsqueeze(0),
-                                  size=upsampled_size_out,
-                                  mode='bilinear')[:, :, :h, :w]
-        seg_masks = F.interpolate(seg_preds,
-                                  size=ori_shape[:2],
-                                  mode='bilinear').squeeze(0)
+        seg_preds = F.interpolate(
+            seg_preds.unsqueeze(0),
+            size=upsampled_size_out,
+            mode='bilinear',
+            align_corners=False)[:, :, :h, :w]
+        seg_masks = F.interpolate(
+            seg_preds,
+            size=ori_shape[:2],
+            mode='bilinear',
+            align_corners=False).squeeze(0)
         seg_masks = seg_masks > cfg.mask_thr
         return seg_masks, cate_labels, cate_scores

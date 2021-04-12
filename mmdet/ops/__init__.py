@@ -1,19 +1,49 @@
 # This file is added for back-compatibility. Thus, downstream codebase
 # could still use and import mmdet.ops.
 
+try:
+    from mmcv.ops import (ContextBlock, ConvWS2d, conv_ws_2d,
+                          GeneralizedAttention)
+except ImportError:
+    from mmcv.cnn import (ContextBlock, ConvWS2d, conv_ws_2d,
+                          GeneralizedAttention)
+
+from mmcv.cnn import NonLocal2d as NonLocal2D
+from mmcv.cnn import build_plugin_layer
+from mmcv.ops import Conv2d, ConvTranspose2d, CornerPool
+from mmcv.ops import DeformConv2d as DeformConv
+from mmcv.ops import DeformConv2dPack as DeformConvPack
+from mmcv.ops import DeformRoIPool as DeformRoIPooling
+from mmcv.ops import DeformRoIPoolPack as DeformRoIPoolingPack
+from mmcv.ops import Linear, MaskedConv2d, MaxPool2d
+from mmcv.ops import ModulatedDeformConv2d as ModulatedDeformConv
+from mmcv.ops import ModulatedDeformConv2dPack as ModulatedDeformConvPack
+from mmcv.ops import \
+    ModulatedDeformRoIPoolPack as ModulatedDeformRoIPoolingPack
+from mmcv.ops import (RoIAlign, RoIPool, SAConv2d, SigmoidFocalLoss,
+                      SimpleRoIAlign, batched_nms)
+from mmcv.ops import deform_conv2d as deform_conv
+from mmcv.ops import deform_roi_pool as deform_roi_pooling
+from mmcv.ops import get_compiler_version, get_compiling_cuda_version
+from mmcv.ops import modulated_deform_conv2d as modulated_deform_conv
+from mmcv.ops import (nms, nms_match, point_sample,
+                      rel_roi_point_to_rel_img_point, roi_align, roi_pool,
+                      sigmoid_focal_loss, soft_nms)
+
 # yapf: disable
-from mmcv.ops import (ContextBlock, Conv2d, ConvTranspose2d, ConvWS2d,
-                      CornerPool, DeformConv, DeformConvPack, DeformRoIPooling,
-                      DeformRoIPoolingPack, GeneralizedAttention, Linear,
-                      MaskedConv2d, MaxPool2d, ModulatedDeformConv,
-                      ModulatedDeformConvPack, ModulatedDeformRoIPoolingPack,
-                      NonLocal2D, RoIAlign, RoIPool, SAConv2d,
-                      SigmoidFocalLoss, SimpleRoIAlign, batched_nms,
-                      build_plugin_layer, conv_ws_2d, deform_conv,
-                      deform_roi_pooling, get_compiler_version,
-                      get_compiling_cuda_version, modulated_deform_conv, nms,
-                      nms_match, point_sample, rel_roi_point_to_rel_img_point,
-                      roi_align, roi_pool, sigmoid_focal_loss, soft_nms)
+# from mmcv.ops import (ContextBlock, Conv2d, ConvTranspose2d, ConvWS2d,
+#                      CornerPool, DeformConv, DeformConvPack,
+#                      DeformRoIPooling, DeformRoIPoolingPack,
+#                      GeneralizedAttention, Linear,
+#                      MaskedConv2d, MaxPool2d, ModulatedDeformConv,
+#                      ModulatedDeformConvPack, ModulatedDeformRoIPoolingPack,
+#                      NonLocal2D, RoIAlign, RoIPool, SAConv2d,
+#                      SigmoidFocalLoss, SimpleRoIAlign, batched_nms,
+#                      build_plugin_layer, conv_ws_2d, deform_conv,
+#                      deform_roi_pooling, get_compiler_version,
+#                      get_compiling_cuda_version, modulated_deform_conv, nms,
+#                      nms_match, point_sample, rel_roi_point_to_rel_img_point,
+#                      roi_align, roi_pool, sigmoid_focal_loss, soft_nms)
 
 # yapf: enable
 

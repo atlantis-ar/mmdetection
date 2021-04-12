@@ -1,10 +1,13 @@
+import torch
 import torch.nn as nn
 from mmcv.cnn import ConvModule, normal_init
+
 from mmdet.models.builder import HEADS
-import torch
+
 
 @HEADS.register_module()
 class MaskFeatHead(nn.Module):
+
     def __init__(self,
                  in_channels,
                  out_channels,
@@ -42,7 +45,7 @@ class MaskFeatHead(nn.Module):
 
             for j in range(i):
                 if j == 0:
-                    chn = self.in_channels+2 if i==3 else self.in_channels
+                    chn = self.in_channels + 2 if i == 3 else self.in_channels
                     one_conv = ConvModule(
                         chn,
                         self.out_channels,
@@ -54,8 +57,8 @@ class MaskFeatHead(nn.Module):
                     convs_per_level.add_module('conv' + str(j), one_conv)
                     one_upsample = nn.Upsample(
                         scale_factor=2, mode='bilinear', align_corners=False)
-                    convs_per_level.add_module(
-                        'upsample' + str(j), one_upsample)
+                    convs_per_level.add_module('upsample' + str(j),
+                                               one_upsample)
                     continue
 
                 one_conv = ConvModule(
@@ -68,9 +71,7 @@ class MaskFeatHead(nn.Module):
                     inplace=False)
                 convs_per_level.add_module('conv' + str(j), one_conv)
                 one_upsample = nn.Upsample(
-                    scale_factor=2,
-                    mode='bilinear',
-                    align_corners=False)
+                    scale_factor=2, mode='bilinear', align_corners=False)
                 convs_per_level.add_module('upsample' + str(j), one_upsample)
 
             self.convs_all_levels.append(convs_per_level)
@@ -82,8 +83,7 @@ class MaskFeatHead(nn.Module):
                 1,
                 padding=0,
                 conv_cfg=self.conv_cfg,
-                norm_cfg=self.norm_cfg),
-        )
+                norm_cfg=self.norm_cfg), )
 
     def init_weights(self):
         for m in self.modules():
@@ -98,14 +98,16 @@ class MaskFeatHead(nn.Module):
             input_p = inputs[i]
             if i == 3:
                 input_feat = input_p
-                x_range = torch.linspace(-1, 1, input_feat.shape[-1], device=input_feat.device)
-                y_range = torch.linspace(-1, 1, input_feat.shape[-2], device=input_feat.device)
+                x_range = torch.linspace(
+                    -1, 1, input_feat.shape[-1], device=input_feat.device)
+                y_range = torch.linspace(
+                    -1, 1, input_feat.shape[-2], device=input_feat.device)
                 y, x = torch.meshgrid(y_range, x_range)
                 y = y.expand([input_feat.shape[0], 1, -1, -1])
                 x = x.expand([input_feat.shape[0], 1, -1, -1])
                 coord_feat = torch.cat([x, y], 1)
                 input_p = torch.cat([input_p, coord_feat], 1)
-                
+
             feature_add_all_level += self.convs_all_levels[i](input_p)
 
         feature_pred = self.conv_pred(feature_add_all_level)

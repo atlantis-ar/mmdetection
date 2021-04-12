@@ -20,6 +20,7 @@ from .rpn import RPN
 from .single_stage import SingleStageDetector
 from .single_stage_seg import SingleStageSegDetector
 from .solo import SOLO
+from .solov2 import SOLOv2
 from .two_stage import TwoStageDetector
 
 __all__ = [
@@ -27,5 +28,5 @@ __all__ = [
     'FastRCNN', 'FasterRCNN', 'MaskRCNN', 'CascadeRCNN', 'HybridTaskCascade',
     'RetinaNet', 'FCOS', 'GridRCNN', 'MaskScoringRCNN', 'RepPointsDetector',
     'FOVEA', 'FSAF', 'NASFCOS', 'PointRend', 'GFL', 'CornerNet',
-    'SingleStageSegDetector', 'SOLO'
+    'SingleStageSegDetector', 'SOLO', 'SOLOv2'
 ]

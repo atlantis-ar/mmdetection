@@ -3,8 +3,7 @@ import torch
 
 from mmdet.core import bbox2roi, build_assigner, build_sampler
 from mmdet.models.dense_heads import (AnchorHead, CornerHead, FCOSHead,
-                                      FSAFHead, GuidedAnchorHead,
-                                      SOLOHead)
+                                      FSAFHead, GuidedAnchorHead, SOLOHead)
 from mmdet.models.roi_heads.bbox_heads import BBoxHead
 from mmdet.models.roi_heads.mask_heads import FCNMaskHead, MaskIoUHead
 
@@ -32,10 +31,7 @@ def test_solo_head_loss():
         num_classes=4,
         in_channels=1,
         num_grids=[40, 36, 24, 16, 12],
-        loss_mask=dict(
-            type='DiceLoss',
-            use_sigmoid=True,
-            loss_weight=3.0),
+        loss_mask=dict(type='DiceLoss', use_sigmoid=True, loss_weight=3.0),
         loss_cls=dict(
             type='FocalLoss',
             use_sigmoid=True,
@@ -62,7 +58,7 @@ def test_solo_head_loss():
     assert empty_cls_loss.item() > 0, 'cls loss should be non-zero'
     assert empty_mask_loss.item() == 0, (
         'there should be no mask loss when there are no true masks')
-    
+
     # When truth is non-empty then both cls and box loss should be nonzero for
     # random inputs
     gt_bboxes = [
@@ -71,7 +67,7 @@ def test_solo_head_loss():
     gt_labels = [torch.LongTensor([2])]
     gt_masks = [(torch.rand((1, 550, 550)) > 0.5).float()]
     one_gt_losses = self.loss(mask_preds, cls_preds, gt_bboxes, gt_labels,
-                                gt_masks, img_metas, gt_bboxes_ignore)
+                              gt_masks, img_metas, gt_bboxes_ignore)
     onegt_mask_loss = one_gt_losses['loss_mask']
     onegt_cls_loss = one_gt_losses['loss_cls']
     assert onegt_cls_loss.item() > 0, 'cls loss should be non-zero'

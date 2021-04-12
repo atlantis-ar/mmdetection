@@ -6,13 +6,12 @@ import tempfile
 import mmcv
 import numpy as np
 from mmcv.utils import print_log
-#from pycocotools.coco import COCO
-#from pycocotools.cocoeval import COCOeval
-#from terminaltables import AsciiTable
+from pycocotools.cocoeval import COCOeval
+from terminaltables import AsciiTable
 
 from .builder import DATASETS
-#from .custom import CustomDataset
 from .coco import CocoDataset
+
 
 @DATASETS.register_module()
 class ScannetDataset(CocoDataset):
@@ -20,37 +19,73 @@ class ScannetDataset(CocoDataset):
         # # Coco
         # 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
         #       'train', 'truck', 'boat', 'traffic_light', 'fire_hydrant',
-        #      'stop_sign', 'parking_meter', 'bench', 'bird', 'cat', 'dog',
-        #       'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
-        #       'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-        #       'skis', 'snowboard', 'sports_ball', 'kite', 'baseball_bat',
-        #       'baseball_glove', 'skateboard', 'surfboard', 'tennis_racket',
-        #       'bottle', 'wine_glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-        #       'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
-        #       'hot_dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-        #      'potted_plant', 'bed', 'dining_table', 'toilet', 'tv', 'laptop',
-        #      'mouse', 'remote', 'keyboard', 'cell_phone', 'microwave',
-        #      'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
-        #      'vase', 'scissors', 'teddy_bear', 'hair_drier', 'toothbrush')
+        #       'stop_sign', 'parking_meter', 'bench', 'bird', 'cat', 'dog',
+        #       'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra',
+        #       'giraffe', 'backpack', 'umbrella', 'handbag', 'tie',
+        #       'suitcase', 'frisbee', 'skis', 'snowboard', 'sports_ball',
+        #       'kite', 'baseball_bat', 'baseball_glove', 'skateboard',
+        #       'surfboard', 'tennis_racket', 'bottle', 'wine_glass', 'cup',
+        #       'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
+        #       'sandwich', 'orange', 'broccoli', 'carrot', 'hot_dog',
+        #       'pizza', 'donut', 'cake', 'chair', 'couch', 'potted_plant',
+        #       'bed', 'dining_table', 'toilet', 'tv', 'laptop', 'mouse',
+        #       'remote', 'keyboard', 'cell_phone', 'microwave', 'oven',
+        #       'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
+        #       'scissors', 'teddy_bear', 'hair_drier', 'toothbrush')
         # scannet
-        'wall', 'floor', 'cabinet', 'bed', 'chair', 'sofa', 'table', 'door',
-        'window', 'bookshelf', 'picture', 'counter', 'blinds', 'desk', 'shelves',
-        'curtain', 'dresser', 'pillow', 'mirror', 'floor mat', 'clothes', 'ceiling',
-        'books', 'refridgerator', 'television', 'paper', 'towel', 'shower curtain',
-        'box', 'whiteboard', 'person', 'nightstand', 'toilet', 'sink', 'lamp', 'bathtub',
-        'bag', 'otherstructure', 'otherfurniture', 'otherprop')
+        'wall',
+        'floor',
+        'cabinet',
+        'bed',
+        'chair',
+        'sofa',
+        'table',
+        'door',
+        'window',
+        'bookshelf',
+        'picture',
+        'counter',
+        'blinds',
+        'desk',
+        'shelves',
+        'curtain',
+        'dresser',
+        'pillow',
+        'mirror',
+        'floor mat',
+        'clothes',
+        'ceiling',
+        'books',
+        'refridgerator',
+        'television',
+        'paper',
+        'towel',
+        'shower curtain',
+        'box',
+        'whiteboard',
+        'person',
+        'nightstand',
+        'toilet',
+        'sink',
+        'lamp',
+        'bathtub',
+        'bag',
+        'otherstructure',
+        'otherfurniture',
+        'otherprop')
+
     # overlap for evaluation:
-    #'bed'(coco index <=> scannet index: x <=> 4
-    #'chair' (coco index <=> scannet index: x <=> 5
-    #'sofa'<=> couch???
-    #'table'/desk <=> dining table
-    #'books'<=> book,
-    #'refridgerator' <=> refrigerator
-    #'television'<=> tv,
-    #'person',
+    # 'bed'(coco index <=> scannet index: x <=> 4
+    # 'chair' (coco index <=> scannet index: x <=> 5
+    # 'sofa'<=> couch???
+    # 'table'/desk <=> dining table
+    # 'books'<=> book,
+    # 'refridgerator' <=> refrigerator
+    # 'television'<=> tv,
+    # 'person',
     # 'toilet',
-    # sink',
-    #'bag' <=> handbag ,
+    # 'sink',
+    # 'bag' <=> handbag ,
 
     # def load_annotations(self, ann_file):
     #     """Load annotation from COCO style annotation file.
@@ -155,7 +190,6 @@ def get_cat_ids(self, idx):
     #         info['filename'] = info['file_name']
     #         data_infos.append(info)
     #     return data_infos
-
 
     def _parse_ann_info(self, img_info, ann_info):
         """Parse bbox and mask annotation.
@@ -346,7 +380,8 @@ def get_cat_ids(self, idx):
             raise TypeError('invalid type of results')
         return result_files
 
-        # def fast_eval_recall(self, results, proposal_nums, iou_thrs, logger=None):
+        # def fast_eval_recall(self, results, proposal_nums, iou_thrs,
+        #       logger=None):
         #     gt_bboxes = []
         #     for i in range(len(self.img_ids)):
         #         ann_ids = self.coco.get_ann_ids(img_ids=self.img_ids[i])
@@ -376,19 +411,21 @@ def get_cat_ids(self, idx):
         Args:
             results (list[tuple | numpy.ndarray]): Testing results of the
                 dataset.
-            jsonfile_prefix (str | None): The prefix of json files. It includes
-                the file path and the prefix of filename, e.g., "a/b/prefix".
+            jsonfile_prefix (str | None): The prefix of json files. It
+                includes the file path and the prefix of filename, e.g.,
+                "a/b/prefix".
                 If not specified, a temp file will be created. Default: None.
 
         Returns:
-            tuple: (result_files, tmp_dir), result_files is a dict containing \
-                the json filepaths, tmp_dir is the temporal directory created \
-                for saving json files when jsonfile_prefix is not specified.
+            tuple: (result_files, tmp_dir), result_files is a dict \
+                containing the json filepaths, tmp_dir is the temporal \
+                directory created for saving json files when jsonfile_prefix \
+                is not specified.
         """
         assert isinstance(results, list), 'results must be a list'
         assert len(results) == len(self), (
             'The length of results is not equal to the dataset len: {} != {}'.
-                format(len(results), len(self)))
+            format(len(results), len(self)))
 
         if jsonfile_prefix is None:
             tmp_dir = tempfile.TemporaryDirectory()
@@ -397,7 +434,6 @@ def get_cat_ids(self, idx):
             tmp_dir = None
         result_files = self.results2json(results, jsonfile_prefix)
         return result_files, tmp_dir
-
 
     # def results2txt(self, results, outfile_prefix):
     #     """Dump the detection results to a txt file.
@@ -416,8 +452,8 @@ def get_cat_ids(self, idx):
     #     try:
     #         import cityscapesscripts.helpers.labels as CSLabels
     #     except ImportError:
-    #         raise ImportError('Please run "pip install citscapesscripts" to '
-    #                           'install cityscapesscripts first.')
+    #         raise ImportError('Please run "pip install citscapesscripts" '
+    #                           to install cityscapesscripts first.')
     #     result_files = []
     #     os.makedirs(outfile_prefix, exist_ok=True)
     #     prog_bar = mmcv.ProgressBar(len(self))
@@ -432,8 +468,8 @@ def get_cat_ids(self, idx):
     #         # segm results
     #         if isinstance(segm_result, tuple):
     #             # Some detectors use different scores for bbox and mask,
-    #             # like Mask Scoring R-CNN. Score of segm will be used instead
-    #             # of bbox score.
+    #             # like Mask Scoring R-CNN. Score of segm will be used
+    #             # instead of bbox score.
     #             segms = mmcv.concat_list(segm_result[0])
     #             mask_score = segm_result[1]
     #         else:
@@ -457,7 +493,7 @@ def get_cat_ids(self, idx):
     #                 score = mask_score[i]
     #                 mask = maskUtils.decode(segms[i]).astype(np.uint8)
     #                 png_filename = osp.join(outfile_prefix,
-    #                                         basename + f'_{i}_{classes}.png')
+    #                                     basename + f'_{i}_{classes}.png')
     #                 mmcv.imwrite(mask, png_filename)
     #                 fout.write(f'{osp.basename(png_filename)} {class_id} '
     #                            f'{score}\n')
@@ -471,23 +507,28 @@ def get_cat_ids(self, idx):
     #
     #     Args:
     #         results (list): Testing results of the dataset.
-    #         txtfile_prefix (str | None): The prefix of txt files. It includes
-    #             the file path and the prefix of filename, e.g., "a/b/prefix".
-    #             If not specified, a temp file will be created. Default: None.
+    #         txtfile_prefix (str | None): The prefix of txt files. It
+    #             includes the file path and the prefix of filename, e.g.,
+    #             "a/b/prefix". If not specified, a temp file will be
+    #             created.
+    #             Default: None.
     #
     #     Returns:
-    #         tuple: (result_files, tmp_dir), result_files is a dict containing \
-    #             the json filepaths, tmp_dir is the temporal directory created \
-    #             for saving txt/png files when txtfile_prefix is not specified.
+    #         tuple: (result_files, tmp_dir), result_files is a dict \
+    #             containing the json filepaths, tmp_dir is the temporal \
+    #             directory created for saving txt/png files when \
+    #             txtfile_prefix is not specified.
     #     """
     #     assert isinstance(results, list), 'results must be a list'
     #     assert len(results) == len(self), (
-    #         'The length of results is not equal to the dataset len: {} != {}'.
+    #         'The length of results is not equal to the dataset
+    #         len: {} != {}'.
     #         format(len(results), len(self)))
     #
     #     assert isinstance(results, list), 'results must be a list'
     #     assert len(results) == len(self), (
-    #         'The length of results is not equal to the dataset len: {} != {}'.
+    #         'The length of results is not equal to the dataset
+    #         len: {} != {}'.
     #         format(len(results), len(self)))
     #
     #     if txtfile_prefix is None:
@@ -515,30 +556,30 @@ def get_cat_ids(self, idx):
     #             'bbox', 'segm', 'proposal', 'proposal_fast'.
     #         logger (logging.Logger | str | None): Logger used for printing
     #             related information during evaluation. Default: None.
-    #         outfile_prefix (str | None): The prefix of output file. It includes
-    #             the file path and the prefix of filename, e.g., "a/b/prefix".
-    #             If results are evaluated with COCO protocol, it would be the
-    #             prefix of output json file. For example, the metric is 'bbox'
-    #             and 'segm', then json files would be "a/b/prefix.bbox.json" and
-    #             "a/b/prefix.segm.json".
-    #             If results are evaluated with cityscapes protocol, it would be
-    #             the prefix of output txt/png files. The output files would be
-    #             png images under folder "a/b/prefix/xxx/" and the file name of
-    #             images would be written into a txt file
+    #         outfile_prefix (str | None): The prefix of output file. It
+    #             includes the file path and the prefix of filename, e.g.,
+    #             "a/b/prefix". If results are evaluated with COCO protocol,
+    #             it would be the prefix of output json file. For example,
+    #             the metric is 'bbox' and 'segm', then json files would be
+    #             "a/b/prefix.bbox.json" and "a/b/prefix.segm.json".
+    #             If results are evaluated with cityscapes protocol, it would
+    #             be the prefix of output txt/png files. The output files
+    #             would be png images under folder "a/b/prefix/xxx/" and the
+    #             file name of images would be written into a txt file
     #             "a/b/prefix/xxx_pred.txt", where "xxx" is the video name of
     #             cityscapes. If not specified, a temp file will be created.
     #             Default: None.
     #         classwise (bool): Whether to evaluating the AP for each class.
-    #         proposal_nums (Sequence[int]): Proposal number used for evaluating
-    #             recalls, such as recall@100, recall@1000.
+    #         proposal_nums (Sequence[int]): Proposal number used for
+    #             evaluating recalls, such as recall@100, recall@1000.
     #             Default: (100, 300, 1000).
     #         iou_thrs (Sequence[float]): IoU threshold used for evaluating
-    #             recalls. If set to a list, the average recall of all IoUs will
-    #             also be computed. Default: 0.5.
+    #             recalls. If set to a list, the average recall of all IoUs
+    #             will also be computed. Default: 0.5.
     #
     #     Returns:
-    #         dict[str, float]: COCO style evaluation metric or cityscapes mAP \
-    #             and AP@50.
+    #         dict[str, float]: COCO style evaluation metric or cityscapes \
+    #             mAP and AP@50.
     #     """
     #     eval_results = dict()
     #
@@ -576,21 +617,23 @@ def get_cat_ids(self, idx):
     #             related information during evaluation. Default: None.
     #
     #     Returns:
-    #         dict[str: float]: Cityscapes evaluation results, contains 'mAP' \
-    #             and 'AP@50'.
+    #         dict[str: float]: Cityscapes evaluation results, contains
+    #             'mAP' and 'AP@50'.
     #     """
     #
     #     try:
-    #         import cityscapesscripts.evaluation.evalInstanceLevelSemanticLabeling as CSEval  # noqa
+    #         import cityscapesscripts.evaluation.evalInstanceLevel-
+    #             SemanticLabeling as CSEval  # noqa
     #     except ImportError:
-    #         raise ImportError('Please run "pip install citscapesscripts" to '
-    #                           'install cityscapesscripts first.')
+    #         raise ImportError('Please run "pip install citscapesscripts"
+    #                           to install cityscapesscripts first.')
     #     msg = 'Evaluating in Cityscapes style'
     #     if logger is None:
     #         msg = '\n' + msg
     #     print_log(msg, logger=logger)
     #
-    #     result_files, tmp_dir = self.format_results(results, txtfile_prefix)
+    #     result_files, tmp_dir = self.format_results(results,
+    #         txtfile_prefix)
     #
     #     if tmp_dir is None:
     #         result_dir = osp.join(txtfile_prefix, 'results')
@@ -598,7 +641,8 @@ def get_cat_ids(self, idx):
     #         result_dir = osp.join(tmp_dir.name, 'results')
     #
     #     eval_results = {}
-    #     print_log(f'Evaluating results under {result_dir} ...', logger=logger)
+    #     print_log(f'Evaluating results under {result_dir} ...',
+    #         logger=logger)
     #
     #     # set global states in cityscapes evaluation API
     #     CSEval.args.cityscapesPath = os.path.join(self.img_prefix, '../..')
@@ -644,8 +688,9 @@ def get_cat_ids(self, idx):
                 'bbox', 'segm', 'proposal', 'proposal_fast'.
             logger (logging.Logger | str | None): Logger used for printing
                 related information during evaluation. Default: None.
-            jsonfile_prefix (str | None): The prefix of json files. It includes
-                the file path and the prefix of filename, e.g., "a/b/prefix".
+            jsonfile_prefix (str | None): The prefix of json files. It
+                includes the file path and the prefix of filename, e.g.,
+                "a/b/prefix".
                 If not specified, a temp file will be created. Default: None.
             classwise (bool): Whether to evaluating the AP for each class.
             proposal_nums (Sequence[int]): Proposal number used for evaluating

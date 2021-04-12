@@ -12,5 +12,5 @@ class SOLO(SingleStageSegDetector):
                  train_cfg=None,
                  test_cfg=None,
                  pretrained=None):
-        super(SOLO, self).__init__(backbone, neck, bbox_head, train_cfg,
+        super(SOLO, self).__init__(backbone, neck, bbox_head, None, train_cfg,
                                    test_cfg, pretrained)

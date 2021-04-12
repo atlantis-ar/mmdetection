@@ -6,9 +6,9 @@ import torch.nn.functional as F
 from mmcv.cnn import ConvModule, bias_init_with_prob, normal_init
 from scipy import ndimage
 
-from mmdet.core import multi_apply, matrix_nms
-from .base_dense_seg_head import BaseDenseSegHead
+from mmdet.core import matrix_nms, multi_apply
 from ..builder import HEADS, build_loss
+from .base_dense_seg_head import BaseDenseSegHead
 
 INF = 1e8
 
@@ -38,28 +38,29 @@ class SOLOv2Head(BaseDenseSegHead):
     https://arxiv.org/abs/1912.04488
     """
 
-    def __init__(self,
-                 num_classes,
-                 in_channels,
-                 seg_feat_channels=256,
-                 stacked_convs=4,
-                 strides=(8, 8, 16, 32, 32),
-                 base_edge_list=(16, 32, 64, 128, 256),
-                 scale_ranges=((1, 96), (48, 192), (96, 384),
-                               (192, 768), (384, 2048)),
-                 sigma=0.2,
-                 num_grids=None,
-                 # cate_down_pos=0,
-                 ins_out_channels=64,
-                 background_label=None,
-                 loss_mask=None,
-                 loss_cls=None,
-                 conv_cfg=None,
-                 norm_cfg=None,
-                 train_cfg=None,
-                 test_cfg=None,
-                 use_dcn_in_tower=False,
-                 type_dcn=None):
+    def __init__(
+            self,
+            num_classes,
+            in_channels,
+            seg_feat_channels=256,
+            stacked_convs=4,
+            strides=(8, 8, 16, 32, 32),
+            base_edge_list=(16, 32, 64, 128, 256),
+            scale_ranges=((1, 96), (48, 192), (96, 384), (192, 768), (384,
+                                                                      2048)),
+            sigma=0.2,
+            num_grids=None,
+            # cate_down_pos=0,
+            ins_out_channels=64,
+            background_label=None,
+            loss_mask=None,
+            loss_cls=None,
+            conv_cfg=None,
+            norm_cfg=None,
+            train_cfg=None,
+            test_cfg=None,
+            use_dcn_in_tower=False,
+            type_dcn=None):
         super(SOLOv2Head, self).__init__()
         self.num_classes = num_classes
         self.seg_num_grids = num_grids
@@ -154,24 +155,32 @@ class SOLOv2Head(BaseDenseSegHead):
         new_feats = self.split_feats(feats)
         featmap_sizes = [featmap.size()[-2:] for featmap in new_feats]
         upsampled_size = (featmap_sizes[0][0] * 2, featmap_sizes[0][1] * 2)
-        cate_pred, kernel_pred = multi_apply(self.forward_single, new_feats,
-                                             list(range(len(self.seg_num_grids))),
-                                             eval=eval, upsampled_size=upsampled_size)
+        cate_pred, kernel_pred = multi_apply(
+            self.forward_single,
+            new_feats,
+            list(range(len(self.seg_num_grids))),
+            eval=eval,
+            upsampled_size=upsampled_size)
         return cate_pred, kernel_pred
 
     def split_feats(self, feats):
-        return (F.interpolate(feats[0], scale_factor=2, mode='bilinear', align_corners=False),
-                feats[1],
-                feats[2],
-                feats[3],
-                F.interpolate(feats[4], size=feats[3].shape[-2:], mode='bilinear', align_corners=False))
+        return (F.interpolate(
+            feats[0], scale_factor=2, mode='bilinear',
+            align_corners=False), feats[1], feats[2], feats[3],
+                F.interpolate(
+                    feats[4],
+                    size=feats[3].shape[-2:],
+                    mode='bilinear',
+                    align_corners=False))
 
     def forward_single(self, x, idx, eval=False, upsampled_size=None):
         ins_kernel_feat = x
         # ins branch
         # concat coord
-        x_range = torch.linspace(-1, 1, ins_kernel_feat.shape[-1], device=ins_kernel_feat.device)
-        y_range = torch.linspace(-1, 1, ins_kernel_feat.shape[-2], device=ins_kernel_feat.device)
+        x_range = torch.linspace(
+            -1, 1, ins_kernel_feat.shape[-1], device=ins_kernel_feat.device)
+        y_range = torch.linspace(
+            -1, 1, ins_kernel_feat.shape[-2], device=ins_kernel_feat.device)
         y, x = torch.meshgrid(y_range, x_range)
         y = y.expand([ins_kernel_feat.shape[0], 1, -1, -1])
         x = x.expand([ins_kernel_feat.shape[0], 1, -1, -1])
@@ -181,7 +190,11 @@ class SOLOv2Head(BaseDenseSegHead):
         # kernel branch
         kernel_feat = ins_kernel_feat
         seg_num_grid = self.seg_num_grids[idx]
-        kernel_feat = F.interpolate(kernel_feat, size=seg_num_grid, mode='bilinear', align_corners=False)
+        kernel_feat = F.interpolate(
+            kernel_feat,
+            size=seg_num_grid,
+            mode='bilinear',
+            align_corners=False)
 
         cate_feat = kernel_feat[:, :-2, :, :]
 
@@ -197,7 +210,8 @@ class SOLOv2Head(BaseDenseSegHead):
         cate_pred = self.solo_cate(cate_feat)
 
         if eval:
-            cate_pred = points_nms(cate_pred.sigmoid(), kernel=2).permute(0, 2, 3, 1)
+            cate_pred = points_nms(
+                cate_pred.sigmoid(), kernel=2).permute(0, 2, 3, 1)
         return cate_pred, kernel_pred
 
     def loss(self,
@@ -211,22 +225,27 @@ class SOLOv2Head(BaseDenseSegHead):
              cfg,
              gt_bboxes_ignore=None):
         mask_feat_size = ins_pred.size()[-2:]
-        ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list = multi_apply(
-            self.solov2_target_single,
-            gt_bbox_list,
-            gt_label_list,
-            gt_mask_list,
-            mask_feat_size=mask_feat_size)
+        ins_label_list, cate_label_list, ins_ind_label_list, \
+            grid_order_list = multi_apply(self.solov2_target_single,
+                                          gt_bbox_list, gt_label_list,
+                                          gt_mask_list,
+                                          mask_feat_size=mask_feat_size)
 
         # ins
-        ins_labels = [torch.cat([ins_labels_level_img
-                                 for ins_labels_level_img in ins_labels_level], 0)
-                      for ins_labels_level in zip(*ins_label_list)]
+        ins_labels = [
+            torch.cat([
+                ins_labels_level_img
+                for ins_labels_level_img in ins_labels_level
+            ], 0) for ins_labels_level in zip(*ins_label_list)
+        ]
 
-        kernel_preds = [[kernel_preds_level_img.view(kernel_preds_level_img.shape[0], -1)[:, grid_orders_level_img]
-                         for kernel_preds_level_img, grid_orders_level_img in
-                         zip(kernel_preds_level, grid_orders_level)]
-                        for kernel_preds_level, grid_orders_level in zip(kernel_preds, zip(*grid_order_list))]
+        kernel_preds = [[
+            kernel_preds_level_img.view(kernel_preds_level_img.shape[0],
+                                        -1)[:, grid_orders_level_img]
+            for kernel_preds_level_img, grid_orders_level_img in zip(
+                kernel_preds_level, grid_orders_level)
+        ] for kernel_preds_level, grid_orders_level in zip(
+            kernel_preds, zip(*grid_order_list))]
         # generate masks
         ins_pred = ins_pred
         ins_pred_list = []
@@ -237,11 +256,12 @@ class SOLOv2Head(BaseDenseSegHead):
                 if kernel_pred.size()[-1] == 0:
                     continue
                 cur_ins_pred = ins_pred[idx, ...]
-                H, W = cur_ins_pred.shape[-2:]
-                N, I = kernel_pred.shape
+                h, w = cur_ins_pred.shape[-2:]
+                n, i = kernel_pred.shape
                 cur_ins_pred = cur_ins_pred.unsqueeze(0)
-                kernel_pred = kernel_pred.permute(1, 0).view(I, -1, 1, 1)
-                cur_ins_pred = F.conv2d(cur_ins_pred, kernel_pred, stride=1).view(-1, H, W)
+                kernel_pred = kernel_pred.permute(1, 0).view(i, -1, 1, 1)
+                cur_ins_pred = F.conv2d(
+                    cur_ins_pred, kernel_pred, stride=1).view(-1, h, w)
                 b_mask_pred.append(cur_ins_pred)
             if len(b_mask_pred) == 0:
                 b_mask_pred = None
@@ -250,29 +270,31 @@ class SOLOv2Head(BaseDenseSegHead):
             ins_pred_list.append(b_mask_pred)
 
         ins_ind_labels = [
-            torch.cat([ins_ind_labels_level_img.flatten()
-                       for ins_ind_labels_level_img in ins_ind_labels_level])
-            for ins_ind_labels_level in zip(*ins_ind_label_list)
+            torch.cat([
+                ins_ind_labels_level_img.flatten()
+                for ins_ind_labels_level_img in ins_ind_labels_level
+            ]) for ins_ind_labels_level in zip(*ins_ind_label_list)
         ]
         flatten_ins_ind_labels = torch.cat(ins_ind_labels)
 
         num_ins = flatten_ins_ind_labels.sum()
 
         # dice loss
-        #loss_ins = []
-        #for input, target in zip(ins_pred_list, ins_labels):
+        # loss_ins = []
+        # for input, target in zip(ins_pred_list, ins_labels):
         #    if input is None:
         #        continue
         #    input = torch.sigmoid(input)
         #    loss_ins.append(dice_loss(input, target))
-        #loss_ins = torch.cat(loss_ins).mean()
-        #loss_ins = loss_ins * self.ins_loss_weight
+        # loss_ins = torch.cat(loss_ins).mean()
+        # loss_ins = loss_ins * self.ins_loss_weight
 
         # cate
         cate_labels = [
-            torch.cat([cate_labels_level_img.flatten()
-                       for cate_labels_level_img in cate_labels_level])
-            for cate_labels_level in zip(*cate_label_list)
+            torch.cat([
+                cate_labels_level_img.flatten()
+                for cate_labels_level_img in cate_labels_level
+            ]) for cate_labels_level in zip(*cate_label_list)
         ]
         flatten_cate_labels = torch.cat(cate_labels)
 
@@ -282,8 +304,8 @@ class SOLOv2Head(BaseDenseSegHead):
         ]
         flatten_cate_preds = torch.cat(cate_preds)
 
-        loss_cls = self.loss_cls(flatten_cate_preds, flatten_cate_labels,
-                                 avg_factor=num_ins + 1)
+        loss_cls = self.loss_cls(
+            flatten_cate_preds, flatten_cate_labels, avg_factor=num_ins + 1)
 
         # dice loss
         loss_mask = []
@@ -294,22 +316,16 @@ class SOLOv2Head(BaseDenseSegHead):
             loss_mask.append(dice_loss(input, target))
         loss_mask = torch.cat(loss_mask).mean()
         loss_mask = loss_mask * self.ins_loss_weight
-        return dict(
-            loss_mask=loss_mask,
-            loss_cls=loss_cls)
+        return dict(loss_mask=loss_mask, loss_cls=loss_cls)
 
-
-    def solov2_target_single(self,
-                             gt_bboxes_raw,
-                             gt_labels_raw,
-                             gt_masks_raw,
+    def solov2_target_single(self, gt_bboxes_raw, gt_labels_raw, gt_masks_raw,
                              mask_feat_size):
 
         device = gt_labels_raw[0].device
 
         # ins
-        gt_areas = torch.sqrt((gt_bboxes_raw[:, 2] - gt_bboxes_raw[:, 0]) * (
-                gt_bboxes_raw[:, 3] - gt_bboxes_raw[:, 1]))
+        gt_areas = torch.sqrt((gt_bboxes_raw[:, 2] - gt_bboxes_raw[:, 0]) *
+                              (gt_bboxes_raw[:, 3] - gt_bboxes_raw[:, 1]))
 
         ins_label_list = []
         cate_label_list = []
@@ -318,16 +334,25 @@ class SOLOv2Head(BaseDenseSegHead):
         for (lower_bound, upper_bound), stride, num_grid \
                 in zip(self.scale_ranges, self.strides, self.seg_num_grids):
 
-            hit_indices = ((gt_areas >= lower_bound) & (gt_areas <= upper_bound)).nonzero(as_tuple = False).flatten()
+            hit_indices = ((gt_areas >= lower_bound) &
+                           (gt_areas <= upper_bound)).nonzero(
+                               as_tuple=False).flatten()
             num_ins = len(hit_indices)
 
             ins_label = []
             grid_order = []
-            cate_label = torch.zeros([num_grid, num_grid], dtype=torch.int64, device=device) + self.num_classes
-            ins_ind_label = torch.zeros([num_grid ** 2], dtype=torch.bool, device=device)
+            cate_label = torch.zeros([num_grid, num_grid],
+                                     dtype=torch.int64,
+                                     device=device) + self.num_classes
+            ins_ind_label = torch.zeros([num_grid**2],
+                                        dtype=torch.bool,
+                                        device=device)
 
             if num_ins == 0:
-                ins_label = torch.zeros([0, mask_feat_size[0], mask_feat_size[1]], dtype=torch.uint8, device=device)
+                ins_label = torch.zeros(
+                    [0, mask_feat_size[0], mask_feat_size[1]],
+                    dtype=torch.uint8,
+                    device=device)
                 ins_label_list.append(ins_label)
                 cate_label_list.append(cate_label)
                 ins_ind_label_list.append(ins_ind_label)
@@ -341,25 +366,40 @@ class SOLOv2Head(BaseDenseSegHead):
             half_hs = 0.5 * (gt_bboxes[:, 3] - gt_bboxes[:, 1]) * self.sigma
 
             # mass center
-            #gt_masks_pt = torch.from_numpy(gt_masks).to(device=device)
-            #center_ws, center_hs = center_of_mass(gt_masks_pt)
-            #valid_mask_flags = gt_masks_pt.sum(dim=-1).sum(dim=-1) > 0
+            # gt_masks_pt = torch.from_numpy(gt_masks).to(device=device)
+            # center_ws, center_hs = center_of_mass(gt_masks_pt)
+            # valid_mask_flags = gt_masks_pt.sum(dim=-1).sum(dim=-1) > 0
 
             output_stride = 4
-            for seg_mask, gt_label, half_h, half_w in zip(gt_masks, gt_labels, half_hs, half_ws):
+            for seg_mask, gt_label, half_h, half_w in zip(
+                    gt_masks, gt_labels, half_hs, half_ws):
                 if seg_mask.sum() < 10:
                     continue
                 upsampled_size = (mask_feat_size[0] * 4, mask_feat_size[1] * 4)
                 center_h, center_w = ndimage.measurements.center_of_mass(
                     seg_mask)
-                coord_w = int((center_w / upsampled_size[1]) // (1. / num_grid))
-                coord_h = int((center_h / upsampled_size[0]) // (1. / num_grid))
+                coord_w = int(
+                    (center_w / upsampled_size[1]) // (1. / num_grid))
+                coord_h = int(
+                    (center_h / upsampled_size[0]) // (1. / num_grid))
 
                 # left, top, right, down
-                top_box = max(0, int(((center_h - half_h) / upsampled_size[0]) // (1. / num_grid)))
-                down_box = min(num_grid - 1, int(((center_h + half_h) / upsampled_size[0]) // (1. / num_grid)))
-                left_box = max(0, int(((center_w - half_w) / upsampled_size[1]) // (1. / num_grid)))
-                right_box = min(num_grid - 1, int(((center_w + half_w) / upsampled_size[1]) // (1. / num_grid)))
+                top_box = max(
+                    0,
+                    int(((center_h - half_h) / upsampled_size[0]) //
+                        (1. / num_grid)))
+                down_box = min(
+                    num_grid - 1,
+                    int(((center_h + half_h) / upsampled_size[0]) //
+                        (1. / num_grid)))
+                left_box = max(
+                    0,
+                    int(((center_w - half_w) / upsampled_size[1]) //
+                        (1. / num_grid)))
+                right_box = min(
+                    num_grid - 1,
+                    int(((center_w + half_w) / upsampled_size[1]) //
+                        (1. / num_grid)))
 
                 top = max(top_box, coord_h - 1)
                 down = min(down_box, coord_h + 1)
@@ -373,24 +413,36 @@ class SOLOv2Head(BaseDenseSegHead):
                     for j in range(left, right + 1):
                         label = int(i * num_grid + j)
 
-                        cur_ins_label = torch.zeros([mask_feat_size[0], mask_feat_size[1]], dtype=torch.uint8,
-                                                    device=device)
-                        cur_ins_label[:seg_mask.shape[0], :seg_mask.shape[1]] = seg_mask
+                        cur_ins_label = torch.zeros(
+                            [mask_feat_size[0], mask_feat_size[1]],
+                            dtype=torch.uint8,
+                            device=device)
+                        cur_ins_label[:seg_mask.shape[0], :seg_mask.
+                                      shape[1]] = seg_mask
                         ins_label.append(cur_ins_label)
                         ins_ind_label[label] = True
                         grid_order.append(label)
             if len(ins_label) == 0:
-                ins_label = torch.zeros([0, mask_feat_size[0], mask_feat_size[1]], dtype=torch.uint8, device=device)
+                ins_label = torch.zeros(
+                    [0, mask_feat_size[0], mask_feat_size[1]],
+                    dtype=torch.uint8,
+                    device=device)
             else:
                 ins_label = torch.stack(ins_label, 0)
             ins_label_list.append(ins_label)
             cate_label_list.append(cate_label)
             ins_ind_label_list.append(ins_ind_label)
             grid_order_list.append(grid_order)
-        return ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list
+        return ins_label_list, cate_label_list, ins_ind_label_list, \
+            grid_order_list
 
-
-    def get_seg(self, cate_preds, kernel_preds, seg_pred, img_metas, cfg, rescale=None):
+    def get_seg(self,
+                cate_preds,
+                kernel_preds,
+                seg_pred,
+                img_metas,
+                cfg,
+                rescale=None):
         num_levels = len(cate_preds)
         featmap_size = seg_pred.size()[-2:]
 
@@ -398,11 +450,14 @@ class SOLOv2Head(BaseDenseSegHead):
         segm_result_list = []
         for img_id in range(len(img_metas)):
             cate_pred_list = [
-                cate_preds[i][img_id].view(-1, self.cate_out_channels).detach() for i in range(num_levels)
+                cate_preds[i][img_id].view(-1,
+                                           self.cate_out_channels).detach()
+                for i in range(num_levels)
             ]
             seg_pred_list = seg_pred[img_id, ...].unsqueeze(0)
             kernel_pred_list = [
-                kernel_preds[i][img_id].permute(1, 2, 0).view(-1, self.kernel_out_channels).detach()
+                kernel_preds[i][img_id].permute(1, 2, 0).view(
+                    -1, self.kernel_out_channels).detach()
                 for i in range(num_levels)
             ]
             img_shape = img_metas[img_id]['img_shape']
@@ -412,17 +467,17 @@ class SOLOv2Head(BaseDenseSegHead):
             cate_pred_list = torch.cat(cate_pred_list, dim=0)
             kernel_pred_list = torch.cat(kernel_pred_list, dim=0)
 
-            result = self.get_seg_single(cate_pred_list, seg_pred_list, kernel_pred_list,
-                                         featmap_size, img_shape, ori_shape, scale_factor, cfg, rescale)
+            result = self.get_seg_single(cate_pred_list, seg_pred_list,
+                                         kernel_pred_list, featmap_size,
+                                         img_shape, ori_shape, scale_factor,
+                                         cfg, rescale)
             bbox_result, segm_result = self.segm2result(result)
             bbox_result_list.append(bbox_result)
             segm_result_list.append(segm_result)
             segm_result_list.append(result)
         return bbox_result_list, segm_result_list
-            #segm_result_list.append(result)
-        #return segm_result_list #bbox_result_list,
-
-
+        # segm_result_list.append(result)
+        # return segm_result_list #bbox_result_list,
 
     # def get_seg(self, seg_preds, cate_preds, img_metas, cfg, rescale=None):
     #     assert len(seg_preds) == len(cate_preds)
@@ -432,7 +487,8 @@ class SOLOv2Head(BaseDenseSegHead):
     #     result_list = []
     #     for img_id in range(len(img_metas)):
     #         cate_pred_list = [
-    #             cate_preds[i][img_id].view(-1, self.cate_out_channels).detach() for i in range(num_levels)
+    #             cate_preds[i][img_id].view(-1, self.cate_out_channels).
+    #             detach() for i in range(num_levels)
     #         ]
     #         seg_pred_list = [
     #             seg_preds[i][img_id].detach() for i in range(num_levels)
@@ -445,32 +501,38 @@ class SOLOv2Head(BaseDenseSegHead):
     #         seg_pred_list = torch.cat(seg_pred_list, dim=0)
     #
     #         result = self.get_seg_single(cate_pred_list, seg_pred_list,
-    #                                      featmap_size, img_shape, ori_shape, scale_factor, cfg, rescale)
+    #                                      featmap_size, img_shape,
+    #                                      ori_shape, scale_factor, cfg,
+    #                                      rescale)
     #         result_list.append(result)
     #     return result_list
 
-
     def segm2result(self, result):
         if result is None:
-            bbox_result = [np.zeros((0, 5), dtype=np.float32) for i in
-                           range(self.num_classes)]
+            bbox_result = [
+                np.zeros((0, 5), dtype=np.float32)
+                for i in range(self.num_classes)
+            ]
             # BG is not included in num_classes
             segm_result = [[] for _ in range(self.num_classes)]
         else:
-            bbox_result = [np.zeros((0, 5), dtype=np.float32) for i in
-                           range(self.num_classes)]
+            bbox_result = [
+                np.zeros((0, 5), dtype=np.float32)
+                for i in range(self.num_classes)
+            ]
             segm_result = [[] for _ in range(self.num_classes)]
             seg_pred = result[0].cpu().numpy()
             cate_label = result[1].cpu().numpy()
-            #cate_score = result[2].cpu().detach().numpy()
+            # cate_score = result[2].cpu().detach().numpy()
             cate_score = result[2].cpu().numpy()
-            #tensor.detach().numpy()
+            # tensor.detach().numpy()
             num_ins = seg_pred.shape[0]
             # fake bboxes
             bboxes = np.zeros((num_ins, 5), dtype=np.float32)
             bboxes[:, -1] = cate_score
-            bbox_result = [bboxes[cate_label == i, :] for i in
-                           range(self.num_classes)]
+            bbox_result = [
+                bboxes[cate_label == i, :] for i in range(self.num_classes)
+            ]
             for idx in range(num_ins):
                 segm_result[cate_label[idx]].append(seg_pred[idx])
         return bbox_result, segm_result
@@ -506,19 +568,22 @@ class SOLOv2Head(BaseDenseSegHead):
         kernel_preds = kernel_preds[inds[:, 0]]
 
         # trans vector.
-        size_trans = cate_labels.new_tensor(self.seg_num_grids).pow(2).cumsum(0)
+        size_trans = cate_labels.new_tensor(
+            self.seg_num_grids).pow(2).cumsum(0)
         strides = kernel_preds.new_ones(size_trans[-1])
 
         n_stage = len(self.seg_num_grids)
         strides[:size_trans[0]] *= self.strides[0]
         for ind_ in range(1, n_stage):
-            strides[size_trans[ind_ - 1]:size_trans[ind_]] *= self.strides[ind_]
+            strides[size_trans[ind_ -
+                               1]:size_trans[ind_]] *= self.strides[ind_]
         strides = strides[inds[:, 0]]
 
         # mask encoding.
         I, N = kernel_preds.shape
         kernel_preds = kernel_preds.view(I, N, 1, 1)
-        seg_preds = F.conv2d(seg_preds, kernel_preds, stride=1).squeeze(0).sigmoid()
+        seg_preds = F.conv2d(
+            seg_preds, kernel_preds, stride=1).squeeze(0).sigmoid()
         # mask.
         seg_masks = seg_preds > cfg.mask_thr
         sum_masks = seg_masks.sum((1, 2)).float()
@@ -549,8 +614,13 @@ class SOLOv2Head(BaseDenseSegHead):
         cate_labels = cate_labels[sort_inds]
 
         # Matrix NMS
-        cate_scores = matrix_nms(seg_masks, cate_labels, cate_scores,
-                                 kernel=cfg.kernel, sigma=cfg.sigma, sum_masks=sum_masks)
+        cate_scores = matrix_nms(
+            seg_masks,
+            cate_labels,
+            cate_scores,
+            kernel=cfg.kernel,
+            sigma=cfg.sigma,
+            sum_masks=sum_masks)
 
         # filter.
         keep = cate_scores >= cfg.update_thr
@@ -568,11 +638,15 @@ class SOLOv2Head(BaseDenseSegHead):
         cate_scores = cate_scores[sort_inds]
         cate_labels = cate_labels[sort_inds]
 
-        seg_preds = F.interpolate(seg_preds.unsqueeze(0),
-                                  size=upsampled_size_out,
-                                  mode='bilinear', align_corners=False)[:, :, :h, :w]
-        seg_masks = F.interpolate(seg_preds,
-                                  size=ori_shape[:2],
-                                  mode='bilinear', align_corners=False).squeeze(0)
+        seg_preds = F.interpolate(
+            seg_preds.unsqueeze(0),
+            size=upsampled_size_out,
+            mode='bilinear',
+            align_corners=False)[:, :, :h, :w]
+        seg_masks = F.interpolate(
+            seg_preds,
+            size=ori_shape[:2],
+            mode='bilinear',
+            align_corners=False).squeeze(0)
         seg_masks = seg_masks > cfg.mask_thr
         return seg_masks, cate_labels, cate_scores
