@@ -446,6 +446,7 @@ class SOLOv2Head(BaseDenseSegHead):
         num_levels = len(cate_preds)
         featmap_size = seg_pred.size()[-2:]
 
+        result_list = []
         bbox_result_list = []
         segm_result_list = []
         for img_id in range(len(img_metas)):
@@ -474,10 +475,12 @@ class SOLOv2Head(BaseDenseSegHead):
             bbox_result, segm_result = self.segm2result(result)
             bbox_result_list.append(bbox_result)
             segm_result_list.append(segm_result)
-            segm_result_list.append(result)
+            result_list.append(result)
+        # # Note WES: use this implementation for inference, e.g. wes_python_demo.py
         return bbox_result_list, segm_result_list
-        # segm_result_list.append(result)
-        # return segm_result_list #bbox_result_list,
+        # # Note WES: use this implementation for test_ins_vis.py
+        # return result_list #bbox_result_list,
+
 
     # def get_seg(self, seg_preds, cate_preds, img_metas, cfg, rescale=None):
     #     assert len(seg_preds) == len(cate_preds)
@@ -523,8 +526,8 @@ class SOLOv2Head(BaseDenseSegHead):
             segm_result = [[] for _ in range(self.num_classes)]
             seg_pred = result[0].cpu().numpy()
             cate_label = result[1].cpu().numpy()
-            # cate_score = result[2].cpu().detach().numpy()
-            cate_score = result[2].cpu().numpy()
+            cate_score = result[2].cpu().detach().numpy()
+            # cate_score = result[2].cpu().numpy()
             # tensor.detach().numpy()
             num_ins = seg_pred.shape[0]
             # fake bboxes

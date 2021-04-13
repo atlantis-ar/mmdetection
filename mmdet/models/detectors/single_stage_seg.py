@@ -142,9 +142,11 @@ class SingleStageSegDetector(BaseDetector):
         else:
             seg_inputs = outs + (img_meta, self.test_cfg, rescale)
 
+        # # Note WES: use this implementation for test_ins_vis.py
         # seg_result = self.bbox_head.get_seg(*seg_inputs)
         # return seg_result
 
+        # # Note WES: use this implementation for inference, e.g. wes_python_demo.py
         # seg_inputs = outs + (img_meta, self.test_cfg, rescale)
         bbox_results, segm_results = self.bbox_head.get_seg(*seg_inputs)
         return bbox_results[0], segm_results[0]

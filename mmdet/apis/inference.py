@@ -167,11 +167,15 @@ def show_result_pyplot(model,
     """
     if hasattr(model, 'module'):
         model = model.module
+
+    show = False
     img = model.show_result(
-        img, result, score_thr=score_thr, show=False, out_file=out_file)
-    plt.figure(figsize=fig_size)
-    plt.imshow(mmcv.bgr2rgb(img))
-    plt.show()
+        img, result, score_thr=score_thr, show=show, out_file=out_file)
+
+    if show:
+        plt.figure(figsize=fig_size)
+        plt.imshow(mmcv.bgr2rgb(img))
+        plt.show()
 
     if out_file:
         print('saving result to ' + out_file)
