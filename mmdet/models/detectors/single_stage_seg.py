@@ -1,5 +1,7 @@
 import torch.nn as nn
 
+from mmdet.core import bbox2result
+
 from ..builder import DETECTORS, build_backbone, build_head, build_neck
 from .base import BaseDetector
 
@@ -22,7 +24,6 @@ class SingleStageSegDetector(BaseDetector):
                  pretrained=None):
 
         super(SingleStageSegDetector, self).__init__()
-        print('im SingleStageSegDetector init...')
         self.backbone = build_backbone(backbone)
         if neck is not None:
             self.neck = build_neck(neck)
@@ -49,8 +50,8 @@ class SingleStageSegDetector(BaseDetector):
             if isinstance(self.neck, nn.Sequential):
                 for m in self.neck:
                     m.init_weights()
-            else:
-                self.neck.init_weights()
+        else:
+            self.neck.init_weights()
         if self.with_mask_feat_head:
             if isinstance(self.mask_feat_head, nn.Sequential):
                 for m in self.mask_feat_head:
@@ -111,7 +112,7 @@ class SingleStageSegDetector(BaseDetector):
         if self.with_mask_feat_head:
             mask_feat_pred = self.mask_feat_head(
                 x[self.mask_feat_head.
-                  start_level:self.mask_feat_head.end_level + 1])
+                      start_level:self.mask_feat_head.end_level + 1])
             loss_inputs = outs + (mask_feat_pred, gt_bboxes, gt_labels,
                                   gt_masks, img_metas, self.train_cfg)
         else:
@@ -121,7 +122,7 @@ class SingleStageSegDetector(BaseDetector):
         losses1 = self.bbox_head.loss(
             *loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
 
-        # TODO: or compute losses like this:
+        # WES TODO: or compute losses like this:
         # losses2 = self.bbox_head.forward_train(x, img_metas, gt_bboxes,
         #                                       gt_labels, gt_bboxes_ignore,
         #                                       gt_masks)
@@ -136,18 +137,20 @@ class SingleStageSegDetector(BaseDetector):
         if self.with_mask_feat_head:
             mask_feat_pred = self.mask_feat_head(
                 x[self.mask_feat_head.
-                  start_level:self.mask_feat_head.end_level + 1])
+                      start_level:self.mask_feat_head.end_level + 1])
             seg_inputs = outs + (mask_feat_pred, img_meta, self.test_cfg,
                                  rescale)
         else:
             seg_inputs = outs + (img_meta, self.test_cfg, rescale)
 
         # # Note WES: use this implementation for test_ins_vis.py
-        # seg_result = self.bbox_head.get_seg(*seg_inputs)
-        # return seg_result
+        #seg_result = self.bbox_head.get_seg(*seg_inputs)
+        # code from solov2 github WXinlong
+        #return seg_result
 
         # # Note WES: use this implementation for inference, e.g. wes_python_demo.py
         # seg_inputs = outs + (img_meta, self.test_cfg, rescale)
+        # code is also like this in mmdetection (v2.3) SOLO branch
         bbox_results, segm_results = self.bbox_head.get_seg(*seg_inputs)
         return bbox_results[0], segm_results[0]
 

@@ -312,6 +312,9 @@ class Collect(object):
         data = {}
         img_meta = {}
         for key in self.meta_keys:
+            # #'WES: todo' ori_filename was used in a previous version
+            # if key=="ori_filename":
+            #     continue
             img_meta[key] = results[key]
         data['img_metas'] = DC(img_meta, cpu_only=True)
         for key in self.keys:

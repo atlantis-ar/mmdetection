@@ -206,6 +206,19 @@ class CustomDataset(Dataset):
         results = dict(img_info=img_info, ann_info=ann_info)
         if self.proposals is not None:
             results['proposals'] = self.proposals[idx]
+
+        # added by WES:
+        # check if there was an annotation found (which had no attribute iscrowd=true, which is ignored).
+        # if not, an empty tensor would result in a problem.
+        if len(results['ann_info']['bboxes']) <= 0:
+            print("no annotations (with iscrowd=0) were found for image with id: "+str(img_info['id']))
+            return None
+        if len(results['ann_info']['labels']) <= 0:
+            return None
+        # I think this one is optional
+        #if len(results['ann_info']['masks']) <= 0:
+        #    return None
+
         self.pre_pipeline(results)
         return self.pipeline(results)
 

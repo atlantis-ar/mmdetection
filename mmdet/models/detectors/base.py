@@ -10,7 +10,7 @@ from mmcv.utils import print_log
 
 from mmdet.core import auto_fp16
 from mmdet.utils import get_root_logger
-
+from skimage import measure
 
 class BaseDetector(nn.Module, metaclass=ABCMeta):
     """Base class for detectors."""
@@ -262,6 +262,27 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
 
         return outputs
 
+    def binary_mask_to_polygon(self, mask, tolerance=0):
+        polygons = []
+        padded_binary_mask = np.pad(mask, pad_width=1, mode='constant', constant_values=0)
+        contours = measure.find_contours(padded_binary_mask, 0.5)
+        contours = np.subtract(contours, 1)
+        for contour in contours:
+
+            if not np.array_equal(contour[0], contour[-1]):
+                contour = np.vstack(contour, contour[0])
+
+            contour = measure.approximate_polygon(contour, tolerance)
+            if len(contour) < 3:
+                continue
+            contour = np.flip(contour, axis=1)
+            segmentation = contour.ravel().tolist()
+            segmentation = [0 if i < 0 else i for i in segmentation]
+            polygons.append(segmentation)
+
+        return polygons
+
+
     def show_result(self,
                     img,
                     result,
@@ -297,6 +318,7 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
         Returns:
             img (Tensor): Only if not `show` or `out_file`
         """
+
         img = mmcv.imread(img)
         img = img.copy()
         if isinstance(result, tuple):
@@ -305,44 +327,64 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
                 segm_result = segm_result[0]  # ms rcnn
         else:
             bbox_result, segm_result = result, None
+
+        # r1, r2, r3 = bbox_result[0]
+        # segm_result = r1.cpu()
+        # labels = r2.cpu()
+        # scores = r3.cpu()
+
+        #bbox_result has to be a type {list: 80}
         bboxes = np.vstack(bbox_result)
         labels = [
             np.full(bbox.shape[0], i, dtype=np.int32)
             for i, bbox in enumerate(bbox_result)
         ]
+
         labels = np.concatenate(labels)
+
         # draw segmentation masks
         if segm_result is not None and len(labels) > 0:  # non empty
             segms = mmcv.concat_list(segm_result)
             inds = np.where(bboxes[:, -1] > score_thr)[0]
+            #inds = np.where(scores[:] > score_thr)[0]
             np.random.seed(42)
             color_masks = [
                 np.random.randint(0, 256, (1, 3), dtype=np.uint8)
                 for _ in range(max(labels) + 1)
             ]
+            object_counter = 0
+            polygons = []
+            bboxes = []
             for i in inds:
                 i = int(i)
                 color_mask = color_masks[labels[i]]
                 mask = segms[i]
-                img[mask] = img[mask] * 0.5 + color_mask * 0.5
+                #mask = segm_result[i]
+                img[mask] = img[mask] * 0.3 + color_mask * 0.7
+
+                ii = np.nonzero(mask == True)
+                #polygons = self.binary_mask_to_polygon(mask, tolerance)
+                bbox = [int(min(ii[1])), int(min(ii[0])), int(max(ii[1])), int(max(ii[0]))]
+                bboxes.append(bbox)
+                object_counter = object_counter + 1
         # if out_file specified, do not show image in window
         # if out_file is not None:
         #    show = False
         # draw bounding boxes
-        mmcv.imshow_det_bboxes(
-            img,
-            bboxes,
-            labels,
-            class_names=self.CLASSES,
-            score_thr=score_thr,
-            bbox_color=bbox_color,
-            text_color=text_color,
-            thickness=thickness,
-            font_scale=font_scale,
-            win_name=win_name,
-            show=show,
-            wait_time=wait_time,
-            out_file=out_file)
+        # mmcv.imshow_det_bboxes(
+        #     img,
+        #     bboxes,
+        #     labels,
+        #     class_names=self.CLASSES,
+        #     score_thr=score_thr,
+        #     bbox_color=bbox_color,
+        #     text_color=text_color,
+        #     thickness=thickness,
+        #     font_scale=font_scale,
+        #     win_name=win_name,
+        #     show=show,
+        #     wait_time=wait_time,
+        #     out_file=out_file)
 
         # if not (show or out_file):
         return img

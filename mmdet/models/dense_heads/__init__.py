@@ -3,7 +3,7 @@ from .anchor_head import AnchorHead
 from .atss_head import ATSSHead
 from .corner_head import CornerHead
 from .decoupled_solo_head import DecoupledSOLOHead
-from .decoupled_solo_light_head import DecoupledSOLOLightHead
+#from .decoupled_solo_light_head import DecoupledSOLOLightHead
 from .fcos_head import FCOSHead
 from .fovea_head import FoveaHead
 from .free_anchor_retina_head import FreeAnchorRetinaHead
@@ -21,7 +21,7 @@ from .retina_sepbn_head import RetinaSepBNHead
 from .rpn_head import RPNHead
 from .solo_head import SOLOHead
 from .solov2_head import SOLOv2Head
-from .solov2_light_head import SOLOv2LightHead
+#from .solov2_light_head import SOLOv2LightHead
 from .ssd_head import SSDHead
 
 __all__ = [
@@ -30,6 +30,6 @@ __all__ = [
     'SSDHead', 'FCOSHead', 'RepPointsHead', 'FoveaHead',
     'FreeAnchorRetinaHead', 'ATSSHead', 'FSAFHead', 'NASFCOSHead',
     'PISARetinaHead', 'PISASSDHead', 'GFLHead', 'CornerHead', 'SOLOHead',
-    'SOLOv2Head', 'SOLOv2LightHead', 'DecoupledSOLOHead',
-    'DecoupledSOLOLightHead'
+    'SOLOv2Head', #'SOLOv2LightHead',
+    'DecoupledSOLOHead' #, 'DecoupledSOLOLightHead'
 ]

@@ -1,6 +1,9 @@
 import sys
+from os import listdir
+import os.path as osp
+from os import path
 
-from mmdet.apis import inference_detector, init_detector, show_result_pyplot
+from mmdet.apis import async_inference_detector, inference_detector, init_detector, show_result_pyplot
 
 sys.path.insert(0, '../')
 

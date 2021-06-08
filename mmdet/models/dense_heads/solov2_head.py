@@ -12,6 +12,17 @@ from .base_dense_seg_head import BaseDenseSegHead
 
 INF = 1e8
 
+def center_of_mass(bitmasks):
+    _, h, w = bitmasks.size()
+    ys = torch.arange(0, h, dtype=torch.float32, device=bitmasks.device)
+    xs = torch.arange(0, w, dtype=torch.float32, device=bitmasks.device)
+
+    m00 = bitmasks.sum(dim=-1).sum(dim=-1).clamp(min=1e-6)
+    m10 = (bitmasks * xs).sum(dim=-1).sum(dim=-1)
+    m01 = (bitmasks * ys[:, None]).sum(dim=-1).sum(dim=-1)
+    center_x = m10 / m00
+    center_y = m01 / m00
+    return center_x, center_y
 
 def points_nms(heat, kernel=2):
     # kernel must be 2
@@ -33,34 +44,88 @@ def dice_loss(input, target):
 
 
 @HEADS.register_module()
-class SOLOv2Head(BaseDenseSegHead):
-    """SOLO: Segmenting Objects by Locations
-    https://arxiv.org/abs/1912.04488
-    """
+# class SOLOv2Head(BaseDenseSegHead):
+#     """SOLO: Segmenting Objects by Locations
+#     https://arxiv.org/abs/1912.04488
+#     """
+#
+#     def __init__(
+#             self,
+#             num_classes,
+#             in_channels,
+#             seg_feat_channels=256,
+#             stacked_convs=4,
+#             strides=(8, 8, 16, 32, 32),
+#             base_edge_list=(16, 32, 64, 128, 256),
+#             scale_ranges=((1, 96), (48, 192), (96, 384), (192, 768), (384,
+#                                                                       2048)),
+#             sigma=0.2,
+#             num_grids=None,
+#             # cate_down_pos=0,
+#             ins_out_channels=64,
+#             background_label=None,
+#             loss_mask=None,
+#             loss_cls=None,
+#             conv_cfg=None,
+#             norm_cfg=None,
+#             train_cfg=None,
+#             test_cfg=None,
+#             use_dcn_in_tower=False,
+#             type_dcn=None):
+#         super(SOLOv2Head, self).__init__()
+#         self.num_classes = num_classes
+#         self.seg_num_grids = num_grids
+#         self.cate_out_channels = self.num_classes
+#         self.ins_out_channels = ins_out_channels
+#         self.in_channels = in_channels
+#         self.seg_feat_channels = seg_feat_channels
+#         self.stacked_convs = stacked_convs
+#         self.strides = strides
+#         self.sigma = sigma
+#         self.stacked_convs = stacked_convs
+#         self.kernel_out_channels = self.ins_out_channels * 1 * 1
+#         # self.cate_down_pos = cate_down_pos
+#         self.base_edge_list = base_edge_list
+#         self.scale_ranges = scale_ranges
+#         self.background_label = (
+#             num_classes if background_label is None else background_label)
+#         # background_label should be either 0 or num_classes
+#         assert (self.background_label == 0
+#                 or self.background_label == num_classes)
+#         self.loss_cls = build_loss(loss_cls)
+#         self.ins_loss_weight = loss_mask['loss_weight']
+#         self.conv_cfg = conv_cfg
+#         self.norm_cfg = norm_cfg
+#         self.train_cfg = train_cfg
+#         self.test_cfg = test_cfg
+#         self.use_dcn_in_tower = use_dcn_in_tower
+#         self.type_dcn = type_dcn
+#         self._init_layers()
+class SOLOv2Head(nn.Module):
 
-    def __init__(
-            self,
-            num_classes,
-            in_channels,
-            seg_feat_channels=256,
-            stacked_convs=4,
-            strides=(8, 8, 16, 32, 32),
-            base_edge_list=(16, 32, 64, 128, 256),
-            scale_ranges=((1, 96), (48, 192), (96, 384), (192, 768), (384,
-                                                                      2048)),
-            sigma=0.2,
-            num_grids=None,
-            # cate_down_pos=0,
-            ins_out_channels=64,
-            background_label=None,
-            loss_mask=None,
-            loss_cls=None,
-            conv_cfg=None,
-            norm_cfg=None,
-            train_cfg=None,
-            test_cfg=None,
-            use_dcn_in_tower=False,
-            type_dcn=None):
+    def __init__(self,
+                 num_classes,
+                 in_channels,
+                 seg_feat_channels=256,
+                 stacked_convs=4,
+                 strides=(8, 8, 16, 32, 32),
+                 #strides=(4, 8, 16, 32, 64),
+                 base_edge_list=(16, 32, 64, 128, 256),
+                 scale_ranges=((1, 96), (48, 192), (96, 384), (192, 768), (384,2048)),
+                 #scale_ranges=((8, 32), (16, 64), (32, 128), (64, 256), (128, 512)),
+                 sigma=0.2,
+                 num_grids=None,
+                 ins_out_channels=64,
+                 background_label=None,
+                 loss_mask=None,
+                 loss_cls=None,
+                 conv_cfg=None,
+                 norm_cfg=None,
+                 train_cfg=None,
+                 test_cfg=None,
+                 est_cfg=None,
+                 use_dcn_in_tower=False,
+                 type_dcn=None):
         super(SOLOv2Head, self).__init__()
         self.num_classes = num_classes
         self.seg_num_grids = num_grids
@@ -73,7 +138,6 @@ class SOLOv2Head(BaseDenseSegHead):
         self.sigma = sigma
         self.stacked_convs = stacked_convs
         self.kernel_out_channels = self.ins_out_channels * 1 * 1
-        # self.cate_down_pos = cate_down_pos
         self.base_edge_list = base_edge_list
         self.scale_ranges = scale_ranges
         self.background_label = (
@@ -93,6 +157,7 @@ class SOLOv2Head(BaseDenseSegHead):
 
     def _init_layers(self):
         # self.ins_convs = nn.ModuleList()
+        norm_cfg = dict(type='GN', num_groups=32, requires_grad=True)
         self.cate_convs = nn.ModuleList()
         self.kernel_convs = nn.ModuleList()
         for i in range(self.stacked_convs):
@@ -120,7 +185,7 @@ class SOLOv2Head(BaseDenseSegHead):
                     3,
                     stride=1,
                     padding=1,
-                    # conv_cfg=cfg_conv,
+                    conv_cfg=cfg_conv,
                     norm_cfg=self.norm_cfg,
                     bias=self.norm_cfg is None))
 
@@ -163,16 +228,21 @@ class SOLOv2Head(BaseDenseSegHead):
             upsampled_size=upsampled_size)
         return cate_pred, kernel_pred
 
+    # def split_feats(self, feats):
+    #     return (F.interpolate(
+    #         feats[0], scale_factor=0.5, mode='bilinear',
+    #         align_corners=False), feats[1], feats[2], feats[3],
+    #             F.interpolate(
+    #                 feats[4],
+    #                 size=feats[3].shape[-2:],
+    #                 mode='bilinear',
+    #                 align_corners=False))
     def split_feats(self, feats):
-        return (F.interpolate(
-            feats[0], scale_factor=2, mode='bilinear',
-            align_corners=False), feats[1], feats[2], feats[3],
-                F.interpolate(
-                    feats[4],
-                    size=feats[3].shape[-2:],
-                    mode='bilinear',
-                    align_corners=False))
-
+        return (F.interpolate(feats[0], scale_factor=2, mode='bilinear', align_corners=False),
+                feats[1],
+                feats[2],
+                feats[3],
+                F.interpolate(feats[4], size=feats[3].shape[-2:], mode='bilinear', align_corners=False))
     def forward_single(self, x, idx, eval=False, upsampled_size=None):
         ins_kernel_feat = x
         # ins branch
@@ -479,7 +549,7 @@ class SOLOv2Head(BaseDenseSegHead):
         # # Note WES: use this implementation for inference, e.g. wes_python_demo.py
         return bbox_result_list, segm_result_list
         # # Note WES: use this implementation for test_ins_vis.py
-        # return result_list #bbox_result_list,
+        #return result_list #bbox_result_list,
 
 
     # def get_seg(self, seg_preds, cate_preds, img_metas, cfg, rescale=None):

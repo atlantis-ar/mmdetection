@@ -56,7 +56,13 @@ class LoadImageFromFile(object):
         else:
             filename = results['img_info']['filename']
 
-        img_bytes = self.file_client.get(filename)
+        try:
+            img_bytes = self.file_client.get(filename)
+        except IOError:
+            print("Error: File does not appear to exist: " + filename)
+            return None
+
+
         img = mmcv.imfrombytes(img_bytes, flag=self.color_type)
         if self.to_float32:
             img = img.astype(np.float32)
