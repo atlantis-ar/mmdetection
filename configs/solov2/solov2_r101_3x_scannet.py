@@ -95,7 +95,7 @@ total_epochs = 3  # 36
 device_ids = range(1)  # 8)
 dist_params = dict(backend='nccl')
 log_level = 'DEBUG'
-work_dir = './work_dirs/solov2_r101_3x_scannet'
+work_dir = './work_dirs/solov2_r101_3x_scannet_short'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]
