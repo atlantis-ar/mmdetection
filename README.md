@@ -1,6 +1,6 @@
 SOLO and SOLOv2 with mmdetection 2.3
 
-NOTE: an implementation of this repository based on a newer verion of mmdetection is now [available](https://github.com/stefOns/mmdetection2)
+**NOTE: an implementation of this repository based on a newer version of mmdetection is now [available](https://github.com/stefOns/mmdetection2)**
 
 This is a fork of https://github.com/WXinlong/mmdetection/ branch SOLO
 mmdetection v2.3.0 (release: open-mmlab#3484)
